@@ -51,22 +51,24 @@ app.post("/register", async (req, res) => {
         return
     }
 
-    let referredByUser = referralCode
-      ? await userModel.findOne({ referralCode })
-      : null;
+    let referredByUser = referralCode? await userModel.findOne({ referralCode }) : null;
+  
+    if (referredByUser) {
+        if(referredByUser.referrals.length<8){
+            referredByUser.referrals.push(user._id);
+            await referredByUser.save();
+        }
+    }
 
      user = await userModel.create({
       name,
       email,
       referralCode: Math.random().toString(36).substring(2),
-      referredBy: referredByUser ? referredByUser._id : null,
+      referredBy: referredByUser.referrals.length<=8 ? referredByUser._id : null,
       earnings: 0,
     });
 
-    if (referredByUser) {
-      referredByUser.referrals.push(user._id);
-      await referredByUser.save();
-    }
+ 
 
     res.json({ message: "User created successfully", user });
   } catch (error) {
