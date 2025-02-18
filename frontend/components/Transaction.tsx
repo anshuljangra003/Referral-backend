@@ -20,15 +20,21 @@ function Transaction({
     const socket = new WebSocket("ws://localhost:8080");
 
     socket.onopen = () => {
+      console.log("Connected to WebSocket");
       socket.send(JSON.stringify({ type: "join", userId }));
     };
 
     socket.onmessage = (event) => {
+      console.log("Received WebSocket Message:", event.data);
       const data = JSON.parse(event.data);
       if (data.type === "updateEarnings" && data.userId === userId) {
-        setEarning(data.newEarnings);
         alert("Earnings updated");
+        setEarning(data.newEarnings);
       }
+    };
+
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
     };
 
     setWs(socket);
@@ -45,8 +51,8 @@ function Transaction({
         amount,
       });
 
-      // Ensure WebSocket is open before sending transaction update
       if (ws && ws.readyState === WebSocket.OPEN) {
+        console.log("Sending WebSocket message for transaction");
         ws.send(
           JSON.stringify({
             type: "transaction",
@@ -56,7 +62,6 @@ function Transaction({
         );
       }
 
-      // Reset input and update UI immediately
       setAmount(0);
     } catch (error) {
       console.error("Transaction failed", error);
@@ -64,21 +69,27 @@ function Transaction({
   }
 
   return (
-    <div>
-      <h1>Earnings - {earning}</h1>
-      <input
-        type="number"
-        placeholder="Enter Amount"
-        value={amount}
-        className="text-black border-b-2"
-        onChange={(e) => setAmount(Number(e.target.value))}
-      />
-      <button
-        className="bg-blue-600 text-white px-4 py-2 rounded-sm"
-        onClick={sendTransaction}
-      >
-        Transaction
-      </button>
+    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">
+        Earnings: <span className="text-blue-600">₹{earning}</span>
+      </h1>
+
+      <div className="flex flex-col space-y-4">
+        <input
+          type="number"
+          placeholder="Enter Amount"
+          value={amount}
+          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+          onChange={(e) => setAmount(Number(e.target.value))}
+        />
+
+        <button
+          className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-300"
+          onClick={sendTransaction}
+        >
+          Make Transaction
+        </button>
+      </div>
     </div>
   );
 }

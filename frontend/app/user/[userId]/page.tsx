@@ -15,7 +15,7 @@ async function page({params}:{params:{userId:string}}) {
 
   return (
     <div>
-        <h1>
+        <h1 className="text-2xl font-bold">
         Welcome {res.data.user.name}
         </h1>
        

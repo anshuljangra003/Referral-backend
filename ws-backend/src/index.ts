@@ -18,6 +18,15 @@ wss.on("connection", (socket) => {
 
     if (data.type === "transaction") {
       const user = await userModel.findOne({ email: data.email });
+      if (userSockets.has(user._id.toString())) {
+        userSockets.get(user._id.toString()).send(
+          JSON.stringify({
+            type: "updateEarnings",
+            userId: user._id.toString(),
+            newEarnings: user.earnings,
+          })
+        );
+      }
 
       if (user?.referredBy) {
         const referrer = await userModel.findById(user.referredBy);

@@ -26,6 +26,13 @@ wss.on("connection", (socket) => {
         }
         if (data.type === "transaction") {
             const user = yield db_1.userModel.findOne({ email: data.email });
+            if (userSockets.has(user._id.toString())) {
+                userSockets.get(user._id.toString()).send(JSON.stringify({
+                    type: "updateEarnings",
+                    userId: user._id.toString(),
+                    newEarnings: user.earnings,
+                }));
+            }
             if (user === null || user === void 0 ? void 0 : user.referredBy) {
                 const referrer = yield db_1.userModel.findById(user.referredBy);
                 if (referrer && userSockets.has(referrer._id.toString())) {
