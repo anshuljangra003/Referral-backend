@@ -8,48 +8,51 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.notifyUser = void 0;
 const ws_1 = require("ws");
+const mongoose_1 = __importDefault(require("mongoose"));
+const db_1 = require("./db");
+mongoose_1.default.connect("mongodb://localhost:27017/referral");
 const wss = new ws_1.WebSocketServer({ port: 8080 });
-const allSockets = [];
+const userSockets = new Map(); // Store active WebSocket connections
 wss.on("connection", (socket) => {
-    console.log("✅ New WebSocket connection established");
     socket.on("message", (message) => __awaiter(void 0, void 0, void 0, function* () {
-        try {
-            const data = JSON.parse(message.toString());
-            if (data.type === "join") {
-                // Store user connection for real-time updates
-                allSockets.push({ userId: data.payload.userId, socket });
-                console.log(`📌 User ${data.payload.userId} joined WebSocket`);
-            }
+        const data = JSON.parse(message.toString());
+        if (data.type === "join") {
+            userSockets.set(data.userId, socket);
         }
-        catch (error) {
-            console.error("❌ Error processing message:", error);
+        if (data.type === "transaction") {
+            const user = yield db_1.userModel.findOne({ email: data.email });
+            if (user === null || user === void 0 ? void 0 : user.referredBy) {
+                const referrer = yield db_1.userModel.findById(user.referredBy);
+                if (referrer && userSockets.has(referrer._id.toString())) {
+                    userSockets.get(referrer._id.toString()).send(JSON.stringify({
+                        type: "updateEarnings",
+                        userId: referrer._id.toString(),
+                        newEarnings: referrer.earnings,
+                    }));
+                }
+                if (referrer === null || referrer === void 0 ? void 0 : referrer.referredBy) {
+                    const referrer2 = yield db_1.userModel.findById(referrer.referredBy);
+                    if (referrer2 && userSockets.has(referrer2._id.toString())) {
+                        userSockets.get(referrer2._id.toString()).send(JSON.stringify({
+                            type: "updateEarnings",
+                            userId: referrer2._id.toString(),
+                            newEarnings: referrer2.earnings,
+                        }));
+                    }
+                }
+            }
         }
     }));
     socket.on("close", () => {
-        // Remove disconnected users
-        for (let i = allSockets.length - 1; i >= 0; i--) {
-            if (allSockets[i].socket === socket) {
-                console.log(`⚠️ User ${allSockets[i].userId} disconnected`);
-                allSockets.splice(i, 1);
+        for (let [key, value] of userSockets.entries()) {
+            if (value === socket) {
+                userSockets.delete(key);
             }
         }
     });
 });
-/**
- * Notify a user in real-time when their referrals (Level 1 or 2) earn money.
- * @param userId - The ID of the parent user to notify.
- * @param earnings - The updated earnings amount.
- */
-const notifyUser = (userId, earnings) => {
-    const userSockets = allSockets.filter((u) => u.userId === userId);
-    userSockets.forEach((user) => {
-        if (user.socket.readyState === ws_1.WebSocket.OPEN) {
-            user.socket.send(JSON.stringify({ type: "earningsUpdate", earnings }));
-            console.log(`📩 Earnings update sent to ${userId}: ₹${earnings}`);
-        }
-    });
-};
-exports.notifyUser = notifyUser;

@@ -1,7 +1,6 @@
 import express from "express";
-
 import { transactionModel, userModel } from "./db";
-
+import cors from "cors";
 import { z } from "zod";
 
 const userSchema = z.object({
@@ -12,101 +11,144 @@ const userSchema = z.object({
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 app.get("/users", async (req, res) => {
-  const users = await userModel.find({});
-  res.json({
-    users,
-  });
+  try {
+    const users = await userModel.find({});
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+app.get("/user/:userId", async (req, res) => {
+  try {
+    const user = await userModel.findById(req.params.userId);
+    if (!user) {
+     res.status(404).json({ message: "User not found" });
+        return
+    }
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
 });
 
 app.post("/register", async (req, res) => {
-  const { name, email, referralCode } = req.body;
+  try {
+    const { name, email, referralCode } = req.body;
 
-  let referredByUser = null;
-  if (referralCode) {
-    referredByUser = await userModel.findOne({ referralCode });
-  }
-  const { success } = userSchema.safeParse(req.body);
-  if (!success) {
-    res.status(411).json({
-      message: "Invalid INPUT TYPE",
+    if (!userSchema.safeParse(req.body).success) {
+      res.status(400).json({ message: "Invalid input type" });
+        return
+    }
+
+    let user = await userModel.findOne({ email });
+    if (user) {
+      res.json({ message: "User already exists", user });
+        return
+    }
+
+    let referredByUser = referralCode
+      ? await userModel.findOne({ referralCode })
+      : null;
+
+     user = await userModel.create({
+      name,
+      email,
+      referralCode: Math.random().toString(36).substring(2),
+      referredBy: referredByUser ? referredByUser._id : null,
+      earnings: 0,
     });
-  }
-  const user = await userModel.create({
-    name,
-    email,
-    referralCode: Math.random().toString(36),
-    referredBy: referredByUser ? referredByUser._id : null,
-    earnings: 0,
-  });
 
-  if (referredByUser) {
-     referredByUser.referrals.push(user._id);
-    await referredByUser.save();
-  }
+    if (referredByUser) {
+      referredByUser.referrals.push(user._id);
+      await referredByUser.save();
+    }
 
-  res.json({
-    message: "user created successfully",
-    user,
-  });
+    res.json({ message: "User created successfully", user });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
 });
-
 
 app.post("/transaction", async (req, res) => {
-  const { email, amount } = req.body;
-  const user = await userModel.findOne({ email });
+  try {
+    const { email, amount } = req.body;
+    const user = await userModel.findOne({ email });
 
-  if (!user) {
-    res.status(404).json({
-      message: "user not found",
+    if (!user) {
+     res.status(404).json({ message: "User not found" });
+    return;
+    }
+
+    let totalSpent = 0;
+
+    if (amount > 1000) {
+      let UserreferredBy = user.referredBy
+        ? await userModel.findById(user.referredBy)
+        : null;
+
+      if (UserreferredBy) {
+        UserreferredBy.earnings += amount * 0.05;
+        totalSpent += amount * 0.05;
+        await UserreferredBy.save();
+      }
+
+      if (UserreferredBy?.referredBy) {
+        const UserreferredBy2 = await userModel.findById(
+          UserreferredBy.referredBy
+        );
+        if (UserreferredBy2) {
+          UserreferredBy2.earnings += amount * 0.01;
+          totalSpent += amount * 0.01;
+          await UserreferredBy2.save();
+        }
+      }
+    }
+
+    user.earnings += amount - totalSpent;
+    await transactionModel.create({
+      user: user._id,
+      amount,
+      earningsDistributed: totalSpent > 0,
+      date: new Date(),
     });
+
+    await user.save();
+
+    res.json({ message: "Transaction successful", user });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
   }
-  let totalSpent = 0;
-  if (amount > 1000) {
-    let UserreferredBy = user.referredBy;
-    if (UserreferredBy) {
-     UserreferredBy = await userModel.findOne(user.referredBy);
-      UserreferredBy.earnings += amount * 0.05;
-      totalSpent += amount * 0.05;
-      // ws call
-      notifyUser(UserreferredBy._id.toString(), UserreferredBy.earnings);
-      await UserreferredBy.save();
-    }
-    if (UserreferredBy.referredBy) {
-      const UserreferredBy2 = await userModel.findOne(
-        UserreferredBy.referredBy
-      );
-      UserreferredBy2.earnings += amount * 0.01;
-      totalSpent += amount * 0.01;
-      notifyUser(UserreferredBy2._id.toString(), UserreferredBy2.earnings);
-
-      await UserreferredBy2.save();
-    }
-  }
-
-  user.earnings += amount - totalSpent;
-  await transactionModel.create({
-    user: user._id,
-    amount,
-    earningsDistributed: totalSpent > 0,
-    date: new Date(),
-  });
-  await user.save();
-
-  res.json({
-    message: "transaction successful",
-  });
-
-
 });
 
-app.get("/transactions", async (req, res)=>{
-    const transactions=await transactionModel.find({});
-    res.json({
-        transactions
-    })
-} )
+app.delete("/user/:userId", async (req, res) => {
+  try {
+    const user = await userModel.findById(req.params.userId);
+    if (!user) {
+      res.status(404).json({ message: "User not found" });
+      return
+    }
 
-app.listen(3000);
+    await userModel.findByIdAndDelete(req.params.userId);
+    res.json({ message: "User deleted" });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+app.get("/transactions", async (req, res) => {
+  try {
+    const transactions = await transactionModel.find({});
+    res.json({ transactions });
+  } catch (error) {
+    res.status(500).json({ message: "Internal Server Error", error });
+  }
+});
+
+app.listen(3001, () => {
+  console.log("Server is running on port 3001");
+});
