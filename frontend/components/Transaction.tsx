@@ -18,27 +18,33 @@ function Transaction({
 
   useEffect(() => {
     const socket = new WebSocket("ws://localhost:8080");
+    try {
+        socket.onopen = () => {
+            console.log("Connected to WebSocket");
+            socket.send(JSON.stringify({ type: "join", userId }));
+          };
+      
+          socket.onmessage = (event) => {
+            console.log("Received WebSocket Message:", event.data);
+            const data = JSON.parse(event.data);
+            if (data.type === "updateEarnings" && data.userId === userId) {
+              alert("Earnings updated");
+              setEarning(data.newEarnings);
+            }
+          };
+          setWs(socket);
 
-    socket.onopen = () => {
-      console.log("Connected to WebSocket");
-      socket.send(JSON.stringify({ type: "join", userId }));
-    };
+      
+    } catch (error) {
+        console.log(error)
+        socket.onerror = (error) => {
+            console.error("WebSocket error:", error);
+          };
+    }
+   
+  
 
-    socket.onmessage = (event) => {
-      console.log("Received WebSocket Message:", event.data);
-      const data = JSON.parse(event.data);
-      if (data.type === "updateEarnings" && data.userId === userId) {
-        alert("Earnings updated");
-        setEarning(data.newEarnings);
-      }
-    };
-
-    socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
-
-    setWs(socket);
-
+   
     return () => {
       socket.close();
     };

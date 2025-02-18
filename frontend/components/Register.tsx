@@ -13,7 +13,7 @@ export default function Register() {
 
     async function sendRequest() {
         console.log("first")
-        // const flag=await axios.get("http://localhost:3001/user/user)
+       
         const data = await axios.post("http://localhost:3001/register", {
             name,
             email,
@@ -36,7 +36,7 @@ export default function Register() {
                         type="text"
                         placeholder="Name"
                         value={name}
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-3 border-2 text-black border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         onChange={(e) => setName(e.target.value)}
                     />
                 </div>
@@ -46,7 +46,7 @@ export default function Register() {
                         type="email"
                         placeholder="Email"
                         value={email}
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-3 border-2 text-black border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         onChange={(e) => setEmail(e.target.value)}
                     />
                 </div>
@@ -56,7 +56,7 @@ export default function Register() {
                         type="text"
                         placeholder="Referral Code(Optional)"
                         value={referralCode}
-                        className="w-full p-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full p-3 border-2 text-black border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         onChange={(e) => setReferralCode(e.target.value)}
                     />
                 </div>
