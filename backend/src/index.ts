@@ -27,52 +27,58 @@ app.get("/user/:userId", async (req, res) => {
   try {
     const user = await userModel.findById(req.params.userId);
     if (!user) {
-     res.status(404).json({ message: "User not found" });
-        return
+      res.status(404).json({ message: "User not found" });
+      return;
     }
     res.json({ user });
   } catch (error) {
     res.status(500).json({ message: "Internal Server Error", error });
   }
 });
-
 app.post("/register", async (req, res) => {
   try {
     const { name, email, referralCode } = req.body;
 
     if (!userSchema.safeParse(req.body).success) {
       res.status(400).json({ message: "Invalid input type" });
-        return
+      return;
     }
 
     let user = await userModel.findOne({ email });
     if (user) {
       res.json({ message: "User already exists", user });
-        return
+      return;
     }
 
-    let referredByUser = referralCode? await userModel.findOne({ referralCode }) : null;
-  
-    if (referredByUser) {
-        if(referredByUser.referrals.length<8){
-            referredByUser.referrals.push(user._id);
-            await referredByUser.save();
-        }
-    }
+    let referredByUser = referralCode
+      ? await userModel.findOne({ referralCode: referralCode })
+      : null;
 
-     user = await userModel.create({
+    // Create new user
+    user = await userModel.create({
       name,
       email,
       referralCode: Math.random().toString(36).substring(2),
-      referredBy: referredByUser.referrals.length<=8 ? referredByUser._id : null,
+      referredBy:
+        referredByUser && referredByUser.referrals.length < 8
+          ? referredByUser._id
+          : null,
       earnings: 0,
     });
 
- 
+    if (referredByUser && referredByUser.referrals.length < 8) {
+      referredByUser.referrals.push(user._id);
+      await referredByUser.save();
+    }
 
     res.json({ message: "User created successfully", user });
   } catch (error) {
-    res.status(500).json({ message: "Internal Server Error", error });
+    res
+      .status(500)
+      .json({
+        message: "Internal Server Error",
+        error: (error as unknown as any).message,
+      });
   }
 });
 
@@ -82,8 +88,8 @@ app.post("/transaction", async (req, res) => {
     const user = await userModel.findOne({ email });
 
     if (!user) {
-     res.status(404).json({ message: "User not found" });
-    return;
+      res.status(404).json({ message: "User not found" });
+      return;
     }
 
     let totalSpent = 0;
@@ -132,7 +138,7 @@ app.delete("/user/:userId", async (req, res) => {
     const user = await userModel.findById(req.params.userId);
     if (!user) {
       res.status(404).json({ message: "User not found" });
-      return
+      return;
     }
 
     await userModel.findByIdAndDelete(req.params.userId);

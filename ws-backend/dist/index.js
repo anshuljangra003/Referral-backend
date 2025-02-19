@@ -17,45 +17,49 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const db_1 = require("./db");
 mongoose_1.default.connect("mongodb://localhost:27017/referral");
 const wss = new ws_1.WebSocketServer({ port: 8080 });
-const userSockets = new Map(); // Store active WebSocket connections
+const userSockets = new Map();
 wss.on("connection", (socket) => {
+    console.log("✅ New WebSocket client connected");
     socket.on("message", (message) => __awaiter(void 0, void 0, void 0, function* () {
         const data = JSON.parse(message.toString());
+        console.log("📩 Received message:", data);
         if (data.type === "join") {
+            console.log(`👤 User ${data.userId} joined`);
             userSockets.set(data.userId, socket);
         }
         if (data.type === "transaction") {
             const user = yield db_1.userModel.findOne({ email: data.email });
-            if (userSockets.has(user._id.toString())) {
+            if (user && userSockets.has(user._id.toString())) {
                 userSockets.get(user._id.toString()).send(JSON.stringify({
-                    type: "updateEarnings",
+                    type: "earningsUpdate",
                     userId: user._id.toString(),
-                    newEarnings: user.earnings,
+                    amount: user.earnings,
                 }));
             }
             if (user === null || user === void 0 ? void 0 : user.referredBy) {
                 const referrer = yield db_1.userModel.findById(user.referredBy);
                 if (referrer && userSockets.has(referrer._id.toString())) {
                     userSockets.get(referrer._id.toString()).send(JSON.stringify({
-                        type: "updateEarnings",
+                        type: "earningsUpdate",
                         userId: referrer._id.toString(),
-                        newEarnings: referrer.earnings,
+                        amount: referrer.earnings,
                     }));
                 }
-                if (referrer === null || referrer === void 0 ? void 0 : referrer.referredBy) {
-                    const referrer2 = yield db_1.userModel.findById(referrer.referredBy);
-                    if (referrer2 && userSockets.has(referrer2._id.toString())) {
-                        userSockets.get(referrer2._id.toString()).send(JSON.stringify({
-                            type: "updateEarnings",
-                            userId: referrer2._id.toString(),
-                            newEarnings: referrer2.earnings,
-                        }));
-                    }
-                }
+            }
+        }
+        if (data.type === "refer") {
+            const user = yield db_1.userModel.findOne({ email: data.email });
+            if (user && userSockets.has(user._id.toString())) {
+                userSockets.get(user._id.toString()).send(JSON.stringify({
+                    type: "referralUpdate",
+                    userId: user._id.toString(),
+                    count: user.referrals.length,
+                }));
             }
         }
     }));
     socket.on("close", () => {
+        console.log("❌ Client disconnected");
         for (let [key, value] of userSockets.entries()) {
             if (value === socket) {
                 userSockets.delete(key);

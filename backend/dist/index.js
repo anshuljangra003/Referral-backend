@@ -59,23 +59,31 @@ app.post("/register", (req, res) => __awaiter(void 0, void 0, void 0, function* 
             return;
         }
         let referredByUser = referralCode
-            ? yield db_1.userModel.findOne({ referralCode })
+            ? yield db_1.userModel.findOne({ referralCode: referralCode })
             : null;
+        // Create new user
         user = yield db_1.userModel.create({
             name,
             email,
             referralCode: Math.random().toString(36).substring(2),
-            referredBy: referredByUser ? referredByUser._id : null,
+            referredBy: referredByUser && referredByUser.referrals.length < 8
+                ? referredByUser._id
+                : null,
             earnings: 0,
         });
-        if (referredByUser) {
+        if (referredByUser && referredByUser.referrals.length < 8) {
             referredByUser.referrals.push(user._id);
             yield referredByUser.save();
         }
         res.json({ message: "User created successfully", user });
     }
     catch (error) {
-        res.status(500).json({ message: "Internal Server Error", error });
+        res
+            .status(500)
+            .json({
+            message: "Internal Server Error",
+            error: error.message,
+        });
     }
 }));
 app.post("/transaction", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
