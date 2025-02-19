@@ -10,6 +10,7 @@ Follow these steps to get the project up and running.
 
 Navigate to each folder and install dependencies:
 ```sh
+git clone https://github.com/anshuljangra003/Referral-backend.git
 cd backend && npm install
 cd ../ws-backend && npm install
 cd ../frontend && npm install
